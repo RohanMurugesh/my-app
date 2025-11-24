@@ -25,6 +25,21 @@ jobs:
       - name: Login to Amazon ECR
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v1
+      - name: Show repo contents for debugging
+        run: |
+          echo "=== repo root ==="
+          ls -la
+          echo "=== client dir ==="
+          ls -la client || true
+          echo "=== server dir ==="
+          ls -la server || true
+          echo "=== show client package files ==="
+          if [ -f client/package-lock.json ]; then echo "client/package-lock.json exists"; head -n 10 client/package-lock.json || true; else echo "client/package-lock.json MISSING"; fi
+          if [ -f client/package.json ]; then echo "client/package.json exists"; head -n 10 client/package.json || true; fi
+          echo "=== show server package files ==="
+          if [ -f server/package-lock.json ]; then echo "server/package-lock.json exists"; head -n 10 server/package-lock.json || true; else echo "server/package-lock.json MISSING"; fi
+          if [ -f server/package.json ]; then echo "server/package.json exists"; head -n 10 server/package.json || true; fi
+
 
       - name: Build, tag and push image to ECR
         env:
