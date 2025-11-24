@@ -14,17 +14,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          # ensure full history and all files are checked out so Docker can COPY everything
+          fetch-depth: 0
 
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v1
       - name: Show repo contents for debugging
         run: |
           echo "=== repo root ==="
@@ -40,14 +33,32 @@ jobs:
           if [ -f server/package-lock.json ]; then echo "server/package-lock.json exists"; head -n 10 server/package-lock.json || true; else echo "server/package-lock.json MISSING"; fi
           if [ -f server/package.json ]; then echo "server/package.json exists"; head -n 10 server/package.json || true; fi
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build, tag and push image to ECR
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          aws ecr create-repository --repository-name $IMAGE_NAME || true
-          docker build -t $IMAGE_NAME:latest .
+          # create repo if missing (idempotent)
+          aws ecr create-repository --repository-name $IMAGE_NAME --region ${{ secrets.AWS_REGION }} || true
+
+          # Use BuildKit and show plain progress so npm errors are visible in logs
+          export DOCKER_BUILDKIT=1
+
+          echo "Building docker image (plain progress)..."
+          docker build --progress=plain -t $IMAGE_NAME:latest .
+
+          echo "Tagging and pushing to ECR..."
           docker tag $IMAGE_NAME:latest $ECR_REGISTRY/$IMAGE_NAME:latest
           docker tag $IMAGE_NAME:latest $ECR_REGISTRY/$IMAGE_NAME:${IMAGE_TAG}
           docker push $ECR_REGISTRY/$IMAGE_NAME:latest
