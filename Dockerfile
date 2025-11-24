@@ -2,7 +2,7 @@
 FROM node:20-alpine AS build-frontend
 WORKDIR /app/client
 COPY client/package.json client/package-lock.json* ./
-RUN npm ci --silent
+RUN npm install --silent
 COPY client/. .
 RUN npm run build
 
@@ -10,7 +10,7 @@ RUN npm run build
 FROM node:20-alpine AS build-server
 WORKDIR /app
 COPY server/package.json server/package-lock.json* ./
-RUN npm ci --silent
+RUN npm install --silent
 COPY server/. .
 COPY --from=build-frontend /app/client/build ./client/build
 
